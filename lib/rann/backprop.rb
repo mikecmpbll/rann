@@ -3,7 +3,8 @@ require "bigdecimal/util"
 require "parallel"
 require "rann/gradient_checker"
 require "rann/util/array_ext"
-require "rann/adagrad"
+require "rann/optimisers/adagrad"
+require "rann/optimisers/rmsprop"
 
 module RANN
   class Backprop
@@ -22,7 +23,7 @@ module RANN
     def initialize network, opts = {}, restore = {}
       @network          = network
       @connections_hash = network.connections.each.with_object({}){ |c, h| h[c.id] = c }
-      @updater          = RANN.const_get(opts[:update_algorithm] || 'AdaGrad').new opts, restore
+      @optimiser        = RANN::Optimisers.const_get(opts[:optimiser] || 'RMSProp').new opts, restore
       @batch_count      = 0.to_d
     end
 
@@ -73,7 +74,7 @@ module RANN
         con = @connections_hash[con_id]
         next if con.locked?
 
-        update = @updater.update gradient, con.id
+        update = @optimiser.update gradient, con.id
 
         con.weight += update
       end
