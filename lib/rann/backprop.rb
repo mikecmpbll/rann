@@ -123,7 +123,7 @@ module RANN
 
             incoming_deltas[this_t][other.id] <<
               if o.is_a?(ProductNeuron)
-                deltas[t][o.id].mult states[t][o.id].div(con.weight, 10), 10
+                deltas[t][o.id].mult o.intermediate.div(states[this_t][other.id], 10), 10
               else
                 deltas[t][o.id].mult con.weight, 10
               end
