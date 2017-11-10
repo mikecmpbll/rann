@@ -1,6 +1,9 @@
+require "bigdecimal"
+require "bigdecimal/util"
 require "parallel"
 require "rann/gradient_checker"
 require "rann/util/array_ext"
+require "rann/adagrad"
 
 module RANN
   class Backprop
@@ -14,27 +17,16 @@ module RANN
       step:   ->(_){ 0.to_d },
     }
 
-    DECAY = BigDecimal.new('0.9')
-    MASTER_STEP_SIZE = BigDecimal.new('0.01')
-    FUDGE_FACTOR = BigDecimal.new('0.00000001')
-    LEARNING_RATE = BigDecimal.new('0.01')
-    FRICTION = BigDecimal.new('0.8')
-    NUM_ITERATIONS_BEFORE_LR_ANNEALING = BigDecimal.new('10')
+    attr_accessor :network
 
-    attr_accessor :network, :lr, :velocities
-
-    def initialize network, restore = {}
-      @network             = network
-      @connections_hash    = network.connections.each.with_object({}){ |c, h| h[c.id] = c }
-      @lr                  = LEARNING_RATE
-      @friction            = FRICTION
-      @velocities          = Hash.new(BigDecimal.new('0'))
-      @historical_gradient = (restore[:historical_gradient] || {}).tap{ |h| h.default = 0.to_d }
-      @historical_update   = Hash.new(MASTER_STEP_SIZE)
-      @batch_count         = BigDecimal.new('0')
+    def initialize network, opts = {}, restore = {}
+      @network          = network
+      @connections_hash = network.connections.each.with_object({}){ |c, h| h[c.id] = c }
+      @updater          = RANN.const_get(opts[:update_algorithm] || 'AdaGrad').new opts, restore
+      @batch_count      = 0.to_d
     end
 
-    def run_batch(inputs, targets, opts = {})
+    def run_batch inputs, targets, opts = {}
       @batch_count += 1
 
       batch_size      = inputs.size
@@ -81,7 +73,7 @@ module RANN
         con = @connections_hash[con_id]
         next if con.locked?
 
-        update = adagrad gradient, con.id
+        update = @updater.update gradient, con.id
 
         con.weight += update
       end
@@ -130,7 +122,11 @@ module RANN
             end
 
             incoming_deltas[this_t][other.id] <<
-              deltas[t][o.id].mult(con.weight, 10)
+              if o.is_a?(ProductNeuron)
+                deltas[t][o.id].mult states[t][o.id].div(con.weight, 10), 10
+              else
+                deltas[t][o.id].mult con.weight, 10
+              end
 
             if incoming_deltas[this_t][other.id].size == network.connections_from(other).size
               sum_of_deltas = incoming_deltas[this_t][other.id].reduce(:+)
