@@ -36,7 +36,7 @@ module RANN
 
       # force longer bits of work per iteration, to maximise CPU usage
       # less marshalling data etc, more work.
-      grouped_inputs  = in_groups inputs, [1, opts[:processes]].max * 10, false
+      grouped_inputs  = in_groups(inputs, [1, opts[:processes]].max * 10, false).reject &:empty?
       grouped_results =
         Parallel.map_with_index grouped_inputs, in_processes: opts[:processes] do |inputs, i|
           group_avg_gradients = Hash.new{ |h, k| h[k] = 0.to_d }
@@ -152,6 +152,8 @@ module RANN
             gradient =
               if con.input_neuron.context?
                 t == 0 ? 0.to_d : nd.mult(states[t - 1][con.input_neuron.id], 10)
+              elsif con.output_neuron.is_a? ProductNeuron
+                nd.mult con.output_neuron.intermediate.div(con.weight, 10), 10
               else
                 nd.mult states[t][con.input_neuron.id], 10
               end

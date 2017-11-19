@@ -8,7 +8,7 @@ module RANN
       def initialize opts = {}, restore = {}
         @decay               = opts[:decay] || 0.9.to_d
         @fudge_factor        = opts[:fudge_factor] || 0.00000001.to_d
-        @learning_rate       = opts[:learning_rate] || 0.01.to_d
+        @learning_rate       = opts[:learning_rate] || 0.001.to_d
         @historical_gradient = (restore[:historical_gradient] || {}).tap{ |h| h.default = 0.to_d }
       end
 
