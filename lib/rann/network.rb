@@ -97,7 +97,10 @@ module RANN
     end
 
     def state
-      neurons.each.with_object({}){ |n, s| s[n.id] = n.value }
+      {
+        values: neurons.each.with_object({}){ |n, s| s[n.id] = n.value },
+        intermediates: neurons.select{ |n| n.is_a? ProductNeuron }.each.with_object({}){ |n, s| s[n.id] = n.intermediate }
+      }
     end
 
     def connections_to neuron

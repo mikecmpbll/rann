@@ -37,27 +37,33 @@ module RANN
       # force longer bits of work per iteration, to maximise CPU usage
       # less marshalling data etc, more work.
       grouped_inputs  = in_groups(inputs, [1, opts[:processes]].max * 10, false).reject &:empty?
-      grouped_results =
-        Parallel.map_with_index grouped_inputs, in_processes: opts[:processes] do |inputs, i|
-          group_avg_gradients = Hash.new{ |h, k| h[k] = 0.to_d }
-          group_avg_error     = 0.to_d
+      reduce_proc =
+        lambda do |_, _, result|
+          group_avg_gradients, group_avg_error = result
 
-          inputs.each do |input|
-            gradients, error = Backprop.run_single(network, input, targets[i])
-
-            gradients.each do |cid, g|
-              group_avg_gradients[cid] += g.div batch_size, 10
-            end
-            group_avg_error += error.div batch_size, 10
-          end
-
-          group_avg_gradients.default_proc = nil
-          [group_avg_gradients, group_avg_error]
+          avg_gradients.merge!(group_avg_gradients){ |_, o, n| o + n }
+          avg_batch_error += group_avg_error
         end
 
-      grouped_results.each do |group_avg_gradients, group_avg_error|
-        avg_gradients.merge!(group_avg_gradients){ |_, o, n| o + n }
-        avg_batch_error += group_avg_error
+      Parallel.each_with_index(
+        grouped_inputs,
+        in_processes: opts[:processes],
+        finish: reduce_proc
+      ) do |inputs, i|
+        group_avg_gradients = Hash.new{ |h, k| h[k] = 0.to_d }
+        group_avg_error = 0.to_d
+
+        inputs.each_with_index do |input, j|
+          gradients, error = Backprop.run_single network, input, targets[i + j]
+
+          gradients.each do |cid, g|
+            group_avg_gradients[cid] += g.div batch_size, 10
+          end
+          group_avg_error += error.div batch_size, 10
+        end
+
+        group_avg_gradients.default_proc = nil
+        [group_avg_gradients, group_avg_error]
       end
 
       if opts[:checking]
@@ -111,33 +117,46 @@ module RANN
 
       # remove this push mechanism, shouldn't be necessary and uses extra memory.
       incoming_deltas = Hash.new{ |h, k| h[k] = Hash.new{ |h, k| h[k] = [] } }
-      # each timestep backwards through time
-      (inputs.size - 1).downto 0 do |t|
-        network.output_neurons.each do |o|
-          traverse from: o, network: network, timestep: t, deltas: deltas do |other, con|
-            if other.context?
-              this_t = t - 1
-              other  = o
-            else
-              this_t = t
-            end
 
-            incoming_deltas[this_t][other.id] <<
-              if o.is_a?(ProductNeuron)
-                deltas[t][o.id].mult o.intermediate.div(states[this_t][other.id], 10), 10
-              else
-                deltas[t][o.id].mult con.weight, 10
-              end
+      intial_timestep = inputs.size - 1
+      connection_stack =
+        network.output_neurons
+          .flat_map{ |n| network.connections_to n }
+          .map{ |c| [c, intial_timestep] }
 
-            if incoming_deltas[this_t][other.id].size == network.connections_from(other).size
-              sum_of_deltas = incoming_deltas[this_t][other.id].reduce(:+)
+      # maybe change this to traverse the static network timestep times if this
+      # proves too difficult to rationalise
+      while current = connection_stack.shift
+        conn, timestep = current
 
-              deltas[this_t][other.id] =
-                ACTIVATION_DERIVATIVES[other.activation_function]
-                  .call(states[this_t][other.id])
-                  .mult(sum_of_deltas, 10)
-            end
+        inp_n = conn.input_neuron
+        out_n = conn.output_neuron
+        out_timestep = out_n.context? ? timestep + 1 : timestep
+
+        # skip if already processed (might've been enqueued by two nodes before
+        # being processed). could alternatively add a check when enqueueing that
+        # not already enqueued? might be better for memory, but slow down
+        # processing.
+        next if deltas[timestep].key?(inp_n.id)
+
+        from_here = bptt_connecting_to inp_n, network, timestep, deltas
+        connection_stack.unshift *from_here
+
+        incoming_deltas[timestep][inp_n.id] <<
+          if out_n.is_a? ProductNeuron
+            intermediate = states[out_timestep][:intermediates][out_n.id]
+            deltas[out_timestep][out_n.id].mult intermediate.div(states[timestep][:values][inp_n.id], 10), 10
+          else
+            deltas[out_timestep][out_n.id].mult conn.weight, 10
           end
+
+        if incoming_deltas[timestep][inp_n.id].size == network.connections_from(inp_n).size
+          sum_of_deltas = incoming_deltas[timestep][inp_n.id].reduce :+
+
+          deltas[timestep][inp_n.id] =
+            ACTIVATION_DERIVATIVES[inp_n.activation_function]
+              .call(states[timestep][:values][inp_n.id])
+              .mult(sum_of_deltas, 10)
         end
       end
 
@@ -145,17 +164,17 @@ module RANN
 
       network.connections.each_with_index do |con, i|
         gradients[con.id] = 0.to_d
-        next if con.output_neuron.context?
 
         (inputs.size - 1).downto 0 do |t|
           if nd = deltas[t][con.output_neuron.id]
             gradient =
               if con.input_neuron.context?
-                t == 0 ? 0.to_d : nd.mult(states[t - 1][con.input_neuron.id], 10)
+                t == 0 ? 0.to_d : nd.mult(states[t - 1][:values][con.input_neuron.id], 10)
               elsif con.output_neuron.is_a? ProductNeuron
-                nd.mult con.output_neuron.intermediate.div(con.weight, 10), 10
+                intermediate = states[t][:intermediates][con.output_neuron.id]
+                nd.mult intermediate.div(con.weight, 10), 10
               else
-                nd.mult states[t][con.input_neuron.id], 10
+                nd.mult states[t][:values][con.input_neuron.id], 10
               end
 
             gradients[con.id] += gradient
@@ -199,21 +218,18 @@ module RANN
       step_one.mult step_two, 10
     end
 
-    def self.traverse from:, network:, timestep:, deltas:, &block
-      # halt traversal if reached next timestep.
-      return if from.context?
-
-      bptt_connecting_to(from, network, timestep, deltas).each do |n, c|
-        yield n, c
-
-        traverse from: n, network: network, timestep: timestep, deltas: deltas, &block
-      end
-    end
-
     def self.bptt_connecting_to neuron, network, timestep, deltas
+      # halt traversal if we're at a context and we're at the base timestep
+      return [] if neuron.context? && timestep == 0
+
       network.connections_to(neuron).each.with_object [] do |c, a|
-        unless c.input_neuron.input? || deltas[timestep].key?(c.input_neuron.id)
-          a << [c.input_neuron, c]
+        # don't enqueue connections from inputs
+        next if c.input_neuron.input?
+
+        timestep -= timestep if neuron.context?
+
+        unless deltas[timestep].key?(c.input_neuron.id)
+          a << [c, timestep]
         end
       end
     end
