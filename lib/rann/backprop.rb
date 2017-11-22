@@ -118,11 +118,11 @@ module RANN
       # remove this push mechanism, shouldn't be necessary and uses extra memory.
       incoming_deltas = Hash.new{ |h, k| h[k] = Hash.new{ |h, k| h[k] = [] } }
 
-      intial_timestep = inputs.size - 1
+      initial_timestep = inputs.size - 1
       connection_stack =
         network.output_neurons
           .flat_map{ |n| network.connections_to n }
-          .map{ |c| [c, intial_timestep] }
+          .map{ |c| [c, initial_timestep] }
 
       # maybe change this to traverse the static network timestep times if this
       # proves too difficult to rationalise

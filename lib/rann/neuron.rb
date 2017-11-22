@@ -5,7 +5,7 @@ require "bigdecimal/util"
 module RANN
   class Neuron
     ACTIVATION_FUNCTIONS = {
-      sig:    ->(v){ 1.to_d.div(1 + (Math::E ** -v), 10) },
+      sig:    ->(v){ 1.to_d.div(1 + Math::E.to_d.power(-v, 10), 10) },
       tanh:   ->(v){ Math.tanh(v).to_d(10) },
       relu:   ->(v){ [0.to_d, v].max },
       linear: ->(v){ v },

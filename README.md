@@ -34,17 +34,16 @@ ruby examples/xor.rb
 
 ## TODO
 
-So much. So much.
+So much.
 
+- Matrix calculations (WIP)
 - Convenience methods for setting up standard network topologies, crucially,
-  layers
-- Batch normalization/drop out/early stopping
+  layers (WIP)
+- Batch normalization/drop out/early stopping (WIP, dep. on matrix)
 - Hyperparameter optimisation
 - Other adaptive learning rate algorithms (Adadelta, Adam, etc?)
 - Explore matrix operations and other ways to optimise performance of algorithms
 - RPROP?
-- Use enumerable-statistics gem?
-- Speed up by adding a reduce step to the parallel gem?
 - More examples
 - Tests
 
