@@ -24,7 +24,9 @@ module RANN
         gradapprox[i] = (error_thetaplus - error_thetaminus).div(EPSILON.mult(2, 10), 10)
       end
 
-      gradapprox.each.with_index.all?{ |ga, i| in_epsilon? ga, dvec[i] }
+      gradapprox.each.with_index.with_object [] do |(ga, i), res|
+        res << i unless in_epsilon? ga, dvec[i]
+      end
     end
 
     def self.error outputs, targets

@@ -69,10 +69,14 @@ module RANN
       if opts[:checking]
         # check assumes batchsize 1 for now
         sorted_gradients = avg_gradients.values_at *network.connections.map(&:id)
-        if GradientChecker.check network, inputs.first, targets.first, sorted_gradients
+        invalid = GradientChecker.check network, inputs.first, targets.first, sorted_gradients
+        if invalid.empty?
           puts "gradient valid"
         else
-          puts "gradient INVALID"
+          puts "gradients INVALID for connections:"
+          invalid.each do |i|
+            puts "#{network.connections[i].input_neuron.name} -> #{network.connections[i].output_neuron.name}"
+          end
         end
       end
 
@@ -106,79 +110,68 @@ module RANN
       error = mse targets, outputs
 
       # backward pass with unravelling for recurrent networks
-      deltas = Hash.new{ |h, k| h[k] = Hash.new(0.to_d) }
-
-      # outputs first
-      network.output_neurons.each.with_index do |o, i|
-        activation_derivative = ACTIVATION_DERIVATIVES[o.activation_function]
-
-        deltas[0][o.id] = mse_delta(targets[i], outputs[i], activation_derivative)
-      end
-
-      # remove this push mechanism, shouldn't be necessary and uses extra memory.
-      incoming_deltas = Hash.new{ |h, k| h[k] = Hash.new{ |h, k| h[k] = [] } }
+      node_deltas = Hash.new{ |h, k| h[k] = Hash.new(0.to_d) }
+      gradients = Hash.new(0)
 
       initial_timestep = inputs.size - 1
-      connection_stack =
-        network.output_neurons
-          .flat_map{ |n| network.connections_to n }
-          .map{ |c| [c, initial_timestep] }
+      neuron_stack = network.output_neurons.map{ |n| [n, initial_timestep] }
 
-      # maybe change this to traverse the static network timestep times if this
-      # proves too difficult to rationalise
-      while current = connection_stack.shift
-        conn, timestep = current
+      while current = neuron_stack.shift
+        neuron, timestep = current
+        next if node_deltas[timestep].key? neuron
 
-        inp_n = conn.input_neuron
-        out_n = conn.output_neuron
-        out_timestep = out_n.context? ? timestep + 1 : timestep
+        from_here = bptt_connecting_to neuron, network, timestep
+        neuron_stack.push *from_here
 
-        # skip if already processed (might've been enqueued by two nodes before
-        # being processed). could alternatively add a check when enqueueing that
-        # not already enqueued? might be better for memory, but slow down
-        # processing.
-        next if deltas[timestep].key?(inp_n.id)
-
-        from_here = bptt_connecting_to inp_n, network, timestep, deltas
-        connection_stack.unshift *from_here
-
-        incoming_deltas[timestep][inp_n.id] <<
-          if out_n.is_a? ProductNeuron
-            intermediate = states[out_timestep][:intermediates][out_n.id]
-            deltas[out_timestep][out_n.id].mult intermediate.div(states[timestep][:values][inp_n.id], 10), 10
+        # neuron delta is summation of neuron deltas deltas for the connections
+        # from this neuron
+        node_delta =
+          if neuron.output?
+            output_index = network.output_neurons.index neuron
+            activation_derivative = ACTIVATION_DERIVATIVES[neuron.activation_function]
+            mse_delta targets[output_index], outputs[output_index], activation_derivative
           else
-            deltas[out_timestep][out_n.id].mult conn.weight, 10
-          end
+            sum_of_deltas =
+              network.connections_from(neuron).reduce 0.to_d do |m, c|
+                out_timestep = c.output_neuron.context? ? timestep + 1 : timestep
+                output_node_delta = node_deltas[out_timestep][c.output_neuron.id]
 
-        if incoming_deltas[timestep][inp_n.id].size == network.connections_from(inp_n).size
-          sum_of_deltas = incoming_deltas[timestep][inp_n.id].reduce :+
+                # connection delta is the output neuron delta multiplied by the
+                # connection's weight
+                connection_delta =
+                  if c.output_neuron.is_a? ProductNeuron
+                    intermediate = states[out_timestep][:intermediates][c.output_neuron.id]
+                    output_node_delta.mult intermediate.div(states[timestep][:values][c.input_neuron.id], 10), 10
+                  else
+                    output_node_delta.mult c.weight, 10
+                  end
 
-          deltas[timestep][inp_n.id] =
-            ACTIVATION_DERIVATIVES[inp_n.activation_function]
-              .call(states[timestep][:values][inp_n.id])
-              .mult(sum_of_deltas, 10)
-        end
-      end
-
-      gradients = {}
-
-      network.connections.each_with_index do |con, i|
-        gradients[con.id] = 0.to_d
-
-        (inputs.size - 1).downto 0 do |t|
-          if nd = deltas[t][con.output_neuron.id]
-            gradient =
-              if con.input_neuron.context?
-                t == 0 ? 0.to_d : nd.mult(states[t - 1][:values][con.input_neuron.id], 10)
-              elsif con.output_neuron.is_a? ProductNeuron
-                intermediate = states[t][:intermediates][con.output_neuron.id]
-                nd.mult intermediate.div(con.weight, 10), 10
-              else
-                nd.mult states[t][:values][con.input_neuron.id], 10
+                m + connection_delta
               end
 
-            gradients[con.id] += gradient
+            ACTIVATION_DERIVATIVES[neuron.activation_function]
+              .call(states[timestep][:values][neuron.id])
+              .mult(sum_of_deltas, 10)
           end
+
+        node_deltas[timestep][neuron.id] = node_delta
+
+        network.connections_to(neuron).each do |c|
+          in_timestep = neuron.context? ? timestep - 1 : timestep
+
+          # connection gradient is the output neuron delta multipled by the
+          # connection's input neuron value.
+          gradient =
+            if c.output_neuron.is_a? ProductNeuron
+              intermediate = states[timestep][:intermediates][c.output_neuron.id]
+              node_delta.mult intermediate.div(c.weight, 10), 10
+            elsif c.input_neuron.context? && timestep == 0
+              0.to_d
+            else
+              node_delta.mult states[in_timestep][:values][c.input_neuron.id], 10
+            end
+
+          gradients[c.id] += gradient
         end
       end
 
@@ -218,7 +211,7 @@ module RANN
       step_one.mult step_two, 10
     end
 
-    def self.bptt_connecting_to neuron, network, timestep, deltas
+    def self.bptt_connecting_to neuron, network, timestep
       # halt traversal if we're at a context and we're at the base timestep
       return [] if neuron.context? && timestep == 0
 
@@ -227,10 +220,7 @@ module RANN
         next if c.input_neuron.input?
 
         timestep -= timestep if neuron.context?
-
-        unless deltas[timestep].key?(c.input_neuron.id)
-          a << [c, timestep]
-        end
+        a << [c.input_neuron, timestep]
       end
     end
   end

@@ -4,6 +4,7 @@ require "rann"
 xor_inputs = [[0,0],[0,1],[1,0],[1,1]]
 xor_targets = [[0],[1],[1],[0]]
 
+time = Time.now.to_i
 results =
   Array.new(100) do |j|
     # inputs
@@ -42,8 +43,6 @@ results =
           checking: false
         )
 
-      # puts "iteration #{i} error: #{avg_error.to_f}"
-
       break if avg_error < 0.0001
     end
 
@@ -51,4 +50,6 @@ results =
     i
   end
 
+taken = Time.now.to_i - time
 puts results.reduce(:+).fdiv(results.size).round(2)
+puts "in #{taken}s"
