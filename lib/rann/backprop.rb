@@ -118,7 +118,7 @@ module RANN
 
       while current = neuron_stack.shift
         neuron, timestep = current
-        next if node_deltas[timestep].key? neuron
+        next if node_deltas[timestep].key? neuron.id
 
         from_here = bptt_connecting_to neuron, network, timestep
         neuron_stack.push *from_here
@@ -186,12 +186,6 @@ module RANN
     def self.reset! network
       network.reset!
       network.neurons.select(&:context?).each{ |n| n.value = 0.to_d }
-    end
-
-    def adagrad avg_grad, cid
-      @historical_gradient[cid] = DECAY.mult(@historical_gradient[cid], 10) + (1 - DECAY).mult(avg_grad.power(2, 10), 10)
-
-      avg_grad.mult(- @lr.div((FUDGE_FACTOR + @historical_gradient[cid]).sqrt(10), 10), 10)
     end
 
     def self.mse targets, outputs
