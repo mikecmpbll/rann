@@ -34,9 +34,12 @@ module RANN
       avg_gradients   = Hash.new{ |h, k| h[k] = 0 }
       avg_batch_error = 0
 
-      # force longer bits of work per iteration, to maximise CPU usage
-      # less marshalling data etc, more work.
-      grouped_inputs  = in_groups(inputs, [1, opts[:processes]].max * 10, false).reject &:empty?
+      # force longer bits of work per iteration, to maximise CPU usage less
+      # marshalling data and process overhead etc. best for small networks. for
+      # larger networks where one unit of work takes a long time, and the work
+      # can vary in time taken, use num_groups == inputs.size
+      num_groups     = opts[:num_groups] || ([1, opts[:processes]].max * 10)
+      grouped_inputs = in_groups(inputs, num_groups, false).reject &:empty?
       reduce_proc =
         lambda do |_, _, result|
           group_avg_gradients, group_avg_error = result
@@ -110,8 +113,8 @@ module RANN
       error = mse targets, outputs
 
       # backward pass with unravelling for recurrent networks
-      node_deltas = Hash.new{ |h, k| h[k] = Hash.new(0.to_d) }
-      gradients = Hash.new(0)
+      node_deltas = Hash.new{ |h, k| h[k] = Hash.new 0.to_d }
+      gradients = Hash.new 0.to_d
 
       initial_timestep = inputs.size - 1
       neuron_stack = network.output_neurons.map{ |n| [n, initial_timestep] }
