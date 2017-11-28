@@ -165,6 +165,16 @@ module RANN
       end
     end
 
+    def init_normalised!
+      connections.each do |c|
+        out_cons = c.output_neuron.connection_count.to_d
+        from     = -1.to_d.div out_cons.sqrt(10), 10
+        to       = 1.to_d.div out_cons.sqrt(10), 10
+        c.weight = (to - from).mult(rand.to_d, 10) + from
+      end
+    end
+    alias init_normalised! init_normalized!
+
     def recalculate_neuron_connection_counts!
       neurons.each do |neuron|
         neuron.connection_count = connections.count{ |c| c.output_neuron == neuron }
