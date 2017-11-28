@@ -1,8 +1,12 @@
-- Simple weight initialisation method
+- Fix alias error.
 
   *Michael Campbell*
 
-- Fix ProductNeuron backprop bug, and index bug in parallel code
+- Simple weight initialisation method.
+
+  *Michael Campbell*
+
+- Fix ProductNeuron backprop bug, and index bug in parallel code.
 
   *Michael Campbell*
 

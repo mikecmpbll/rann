@@ -173,7 +173,7 @@ module RANN
         c.weight = (to - from).mult(rand.to_d, 10) + from
       end
     end
-    alias init_normalised! init_normalized!
+    alias init_normalized! init_normalised!
 
     def recalculate_neuron_connection_counts!
       neurons.each do |neuron|
