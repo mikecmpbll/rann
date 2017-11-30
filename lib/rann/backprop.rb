@@ -20,10 +20,10 @@ module RANN
 
     attr_accessor :network
 
-    def initialize network, opts = {}, restore = {}
+    def initialize network, opts = {}
       @network          = network
       @connections_hash = network.connections.each.with_object({}){ |c, h| h[c.id] = c }
-      @optimiser        = RANN::Optimisers.const_get(opts[:optimiser] || 'RMSProp').new opts, restore
+      @optimiser        = RANN::Optimisers.const_get(opts[:optimiser] || 'RMSProp').new opts
       @batch_count      = 0.to_d
     end
 
@@ -182,8 +182,31 @@ module RANN
       [gradients, error]
     end
 
-    def state
-      { historical_gradient: @historical_gradient }
+    def save filepath = nil
+      filepath ||= "rann_savepoint_#{DateTime.now.strftime('%Y-%m-%d-%H-%M-%S')}.yml"
+
+      weights  = @network.params
+      opt_vars = @optimiser.state
+
+      File.open filepath, "w" do |f|
+        f.write YAML.dump [weights, opt_vars]
+      end
+    end
+
+    def restore filepath
+      unless filepath
+        filepath = Dir['*'].select{ |f| f =~ /rann_savepoint_.*/ }.sort.last
+
+        unless filepath
+          @network.init_normalised!
+          puts "No savepoints found—initialised normalised weights"
+          return
+        end
+      end
+
+      weights, opt_vars = YAML.load_file(filepath)
+      @network.impose(weights)
+      @network.optimiser.load_state(opt_vars)
     end
 
     def self.reset! network
