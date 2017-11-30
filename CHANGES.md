@@ -1,3 +1,7 @@
+- Add save and restore methods to backprop.
+
+  *Michael Campbell*
+
 - Fix alias error.
 
   *Michael Campbell*

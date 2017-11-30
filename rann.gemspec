@@ -12,6 +12,7 @@ Gem::Specification.new do |spec|
   spec.summary       = %q{Ruby Artificial Neural Networks}
   spec.description   = %q{Libary for working with neural networks in Ruby.}
   spec.homepage      = "https://github.com/mikecmpbll/rann"
+  spec.licenses      = 'Apache-2.0'
 
   spec.files         = `git ls-files -z`.split("\x0").reject do |f|
     f.match(%r{^(test|spec|features)/})
@@ -20,8 +21,8 @@ Gem::Specification.new do |spec|
   spec.executables   = spec.files.grep(%r{^exe/}){ |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  spec.add_runtime_dependency "parallel", "~> 1.12.0"
-  spec.add_runtime_dependency "ruby-graphviz", "~> 1.2.3"
+  spec.add_runtime_dependency 'parallel', '~> 1.12', '>= 1.12.0'
+  spec.add_runtime_dependency 'ruby-graphviz', '~> 1.2', '>= 1.2.3'
 
   spec.add_development_dependency "bundler", "~> 1.16"
   spec.add_development_dependency "rake", "~> 10.0"
