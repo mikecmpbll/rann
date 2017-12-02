@@ -18,7 +18,6 @@ module RANN
     end
 
     def init
-      input_bias = RANN::Neuron.new("LSTM #{name} Input Bias", 0, :bias).tap{ |n| @network.add n }
       @size.times do |j|
         input = RANN::Neuron.new("LSTM #{name} Input #{j}", 0, :standard).tap{ |n| @network.add n }
         @inputs << input
@@ -49,10 +48,10 @@ module RANN
         memory_context = RANN::Neuron.new("LSTM #{name} Mem Context #{j}", 1, :context).tap{ |n| @network.add n }
         output_context = RANN::Neuron.new("LSTM #{name} Output Context #{j}", 1, :context).tap{ |n| @network.add n }
 
-        @network.add RANN::LockedConnection.new input, f, 1
-        @network.add RANN::LockedConnection.new input, i, 1
-        @network.add RANN::LockedConnection.new input, g, 1
-        @network.add RANN::LockedConnection.new input, o, 1
+        @network.add RANN::Connection.new input, f
+        @network.add RANN::Connection.new input, i
+        @network.add RANN::Connection.new input, g
+        @network.add RANN::Connection.new input, o
         @network.add RANN::LockedConnection.new f, memory_product, 1
         @network.add RANN::LockedConnection.new i, i_g_product, 1
         @network.add RANN::LockedConnection.new g, i_g_product, 1
@@ -63,8 +62,8 @@ module RANN
         @network.add RANN::LockedConnection.new memory_tanh, memory_o_product, 1
         @network.add RANN::LockedConnection.new memory_o_product, output, 1
         @network.add RANN::LockedConnection.new memory_standard, memory_context, 1
-        @network.add RANN::Connection.new memory_context, memory_product
-        @network.add RANN::Connection.new memory_context, i
+        @network.add RANN::LockedConnection.new memory_context, memory_product, 1
+        @network.add RANN::LockedConnection.new memory_context, i, 1
         @network.add RANN::LockedConnection.new memory_o_product, output_context, 1
         @network.add RANN::Connection.new output_context, f
         @network.add RANN::Connection.new output_context, i
@@ -74,13 +73,12 @@ module RANN
         @network.add RANN::Connection.new bias_i, i
         @network.add RANN::Connection.new bias_g, g
         @network.add RANN::Connection.new bias_o, o
-        @network.add RANN::Connection.new input_bias, input
       end
     end
 
     def add_input neuron
       @inputs.each do |input|
-        @network.add RANN::Connection.new neuron, input
+        @network.add RANN::LockedConnection.new neuron, input, 1
       end
     end
   end
