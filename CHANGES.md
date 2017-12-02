@@ -1,3 +1,11 @@
+## 0.2.7 (December 2, 2017)
+
+- Allow different weights to the different gates in the LSTM. Previously it was
+  using one weighted connection into the LSTM and unweighted connections to the
+  gates, this has been reversed.
+
+  *Michael Campbell*
+
 - Add save and restore methods to backprop.
 
   *Michael Campbell*
