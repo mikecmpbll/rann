@@ -13,9 +13,9 @@ module RANN
       end
 
       def update grad, cid
-        @historical_gradient[cid] = @decay.mult(@historical_gradient[cid], 10) + (1 - @decay).mult(grad.power(2, 10), 10)
+        @historical_gradient[cid] = @decay.mult(@historical_gradient[cid], RANN.d) + (1 - @decay).mult(grad.power(2, RANN.d), RANN.d)
 
-        grad.mult(- @learning_rate.div(@fudge_factor + @historical_gradient[cid].sqrt(10), 10), 10)
+        grad.mult(- @learning_rate.div(@fudge_factor + @historical_gradient[cid].sqrt(RANN.d), RANN.d), RANN.d)
       end
 
       # anything that gets modified over the course of training

@@ -12,9 +12,9 @@ module RANN
 
     ACTIVATION_DERIVATIVES = {
       relu:   ->(x){ x > 0 ? 1.to_d : 0.to_d },
-      sig:    ->(x){ x.mult(1 - x, 10) },
+      sig:    ->(x){ x.mult(1 - x, RANN.d) },
       linear: ->(_){ 1.to_d },
-      tanh:   ->(x){ 1 - x.power(2, 10) },
+      tanh:   ->(x){ 1 - x.power(2, RANN.d) },
       step:   ->(_){ 0.to_d },
     }
 
@@ -60,9 +60,9 @@ module RANN
           gradients, error = Backprop.run_single network, input, targets[i + j]
 
           gradients.each do |cid, g|
-            group_avg_gradients[cid] += g.div batch_size, 10
+            group_avg_gradients[cid] += g.div batch_size, RANN.d
           end
-          group_avg_error += error.div batch_size, 10
+          group_avg_error += error.div batch_size, RANN.d
         end
 
         group_avg_gradients.default_proc = nil
@@ -142,9 +142,9 @@ module RANN
               connection_delta =
                 if c.output_neuron.is_a? ProductNeuron
                   intermediate = states[out_timestep][:intermediates][c.output_neuron.id]
-                  output_node_delta.mult intermediate.div(states[timestep][:values][c.input_neuron.id], 10), 10
+                  output_node_delta.mult intermediate.div(states[timestep][:values][c.input_neuron.id], RANN.d), RANN.d
                 else
-                  output_node_delta.mult c.weight, 10
+                  output_node_delta.mult c.weight, RANN.d
                 end
 
               m + connection_delta
@@ -154,23 +154,22 @@ module RANN
         node_delta =
           ACTIVATION_DERIVATIVES[neuron.activation_function]
             .call(states[timestep][:values][neuron.id])
-            .mult(step_one, 10)
+            .mult(step_one, RANN.d)
 
         node_deltas[timestep][neuron.id] = node_delta
 
+        in_timestep = neuron.context? ? timestep - 1 : timestep
         network.connections_to(neuron).each do |c|
-          in_timestep = neuron.context? ? timestep - 1 : timestep
-
           # connection gradient is the output neuron delta multipled by the
           # connection's input neuron value.
           gradient =
             if c.output_neuron.is_a? ProductNeuron
               intermediate = states[timestep][:intermediates][c.output_neuron.id]
-              node_delta.mult intermediate.div(c.weight, 10), 10
+              node_delta.mult intermediate.div(c.weight, RANN.d), RANN.d
             elsif c.input_neuron.context? && timestep == 0
               0.to_d
             else
-              node_delta.mult states[in_timestep][:values][c.input_neuron.id], 10
+              node_delta.mult states[in_timestep][:values][c.input_neuron.id], RANN.d
             end
 
           gradients[c.id] += gradient
@@ -217,7 +216,7 @@ module RANN
       total_squared_error = 0.to_d
 
       targets.size.times do |i|
-        total_squared_error += (targets[i] - outputs[i]).power(2, 10).div(2, 10)
+        total_squared_error += (targets[i] - outputs[i]).power(2, RANN.d).div 2, RANN.d
       end
 
       total_squared_error

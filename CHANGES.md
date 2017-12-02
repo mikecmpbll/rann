@@ -1,3 +1,7 @@
+- Allow customisable precision, defaults to 10.
+
+  *Michael Campbell*
+
 ## 0.2.7 (December 2, 2017)
 
 - Allow different weights to the different gates in the LSTM. Previously it was

@@ -25,7 +25,7 @@ module RANN
 
     def process
       if processable? && !processed?
-        out_value = input_neuron.value.mult weight, 10
+        out_value = input_neuron.value.mult weight, RANN.d
         output_neuron.push_value! out_value
         @processed = true
       end
@@ -60,7 +60,7 @@ module RANN
       if output_neuron.context?
         1.to_d
       else
-        rand.to_d 10
+        rand.to_d RANN.d
       end
     end
   end
