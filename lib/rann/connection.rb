@@ -25,7 +25,7 @@ module RANN
 
     def process
       if processable? && !processed?
-        out_value = input_neuron.value.mult weight, RANN.d
+        out_value = input_neuron.value * weight
         output_neuron.push_value! out_value
         @processed = true
       end
@@ -60,8 +60,9 @@ module RANN
       if output_neuron.context?
         1.to_d
       else
-        rand.to_d RANN.d
+        rand.to_d BigDecimal.limit
       end
     end
   end
 end
+

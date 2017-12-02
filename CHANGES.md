@@ -1,3 +1,8 @@
+- Worked out how to use BigDecimal properly, lol. Refactored to use
+  `BigDecimal.limit`.
+
+  *Michael Campbell*
+
 - Allow customisable precision, defaults to 10.
 
   *Michael Campbell*

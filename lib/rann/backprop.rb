@@ -12,9 +12,9 @@ module RANN
 
     ACTIVATION_DERIVATIVES = {
       relu:   ->(x){ x > 0 ? 1.to_d : 0.to_d },
-      sig:    ->(x){ x.mult(1 - x, RANN.d) },
+      sig:    ->(x){ x * (1 - x) },
       linear: ->(_){ 1.to_d },
-      tanh:   ->(x){ 1 - x.power(2, RANN.d) },
+      tanh:   ->(x){ 1 - x ** 2 },
       step:   ->(_){ 0.to_d },
     }
 
@@ -60,9 +60,9 @@ module RANN
           gradients, error = Backprop.run_single network, input, targets[i + j]
 
           gradients.each do |cid, g|
-            group_avg_gradients[cid] += g.div batch_size, RANN.d
+            group_avg_gradients[cid] += g / batch_size
           end
-          group_avg_error += error.div batch_size, RANN.d
+          group_avg_error += error / batch_size
         end
 
         group_avg_gradients.default_proc = nil
@@ -142,9 +142,9 @@ module RANN
               connection_delta =
                 if c.output_neuron.is_a? ProductNeuron
                   intermediate = states[out_timestep][:intermediates][c.output_neuron.id]
-                  output_node_delta.mult intermediate.div(states[timestep][:values][c.input_neuron.id], RANN.d), RANN.d
+                  output_node_delta * intermediate / states[timestep][:values][c.input_neuron.id]
                 else
-                  output_node_delta.mult c.weight, RANN.d
+                  output_node_delta * c.weight
                 end
 
               m + connection_delta
@@ -153,8 +153,8 @@ module RANN
 
         node_delta =
           ACTIVATION_DERIVATIVES[neuron.activation_function]
-            .call(states[timestep][:values][neuron.id])
-            .mult(step_one, RANN.d)
+            .call(states[timestep][:values][neuron.id]) *
+            step_one
 
         node_deltas[timestep][neuron.id] = node_delta
 
@@ -165,11 +165,11 @@ module RANN
           gradient =
             if c.output_neuron.is_a? ProductNeuron
               intermediate = states[timestep][:intermediates][c.output_neuron.id]
-              node_delta.mult intermediate.div(c.weight, RANN.d), RANN.d
+              node_delta * intermediate / c.weight
             elsif c.input_neuron.context? && timestep == 0
               0.to_d
             else
-              node_delta.mult states[in_timestep][:values][c.input_neuron.id], RANN.d
+              node_delta * states[in_timestep][:values][c.input_neuron.id]
             end
 
           gradients[c.id] += gradient
@@ -216,7 +216,7 @@ module RANN
       total_squared_error = 0.to_d
 
       targets.size.times do |i|
-        total_squared_error += (targets[i] - outputs[i]).power(2, RANN.d).div 2, RANN.d
+        total_squared_error += (targets[i] - outputs[i]) ** 2 / 2
       end
 
       total_squared_error

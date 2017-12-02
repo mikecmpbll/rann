@@ -1,12 +1,13 @@
 require "securerandom"
 require "bigdecimal"
+require "bigdecimal/math"
 require "bigdecimal/util"
 
 module RANN
   class Neuron
     ACTIVATION_FUNCTIONS = {
-      sig:    ->(v){ 1.to_d.div(1 + Math::E.to_d.power(-v, RANN.d), RANN.d) },
-      tanh:   ->(v){ Math.tanh(v).to_d(RANN.d) },
+      sig:    ->(v){ 1.to_d / (1 + BigMath.E(BigDecimal.limit) ** -v) },
+      tanh:   ->(v){ Math.tanh(v).to_d(BigDecimal.limit) },
       relu:   ->(v){ [0.to_d, v].max },
       linear: ->(v){ v },
       step:   ->(v){ v > 0.5 ? 1.to_d : 0.to_d },

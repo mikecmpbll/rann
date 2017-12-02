@@ -168,9 +168,9 @@ module RANN
     def init_normalised!
       connections.each do |c|
         out_cons = c.output_neuron.connection_count.to_d
-        from     = -1.to_d.div out_cons.sqrt(RANN.d), RANN.d
-        to       = 1.to_d.div out_cons.sqrt(RANN.d), RANN.d
-        c.weight = (to - from).mult(rand.to_d, RANN.d) + from
+        from     = -1.to_d / out_cons.sqrt(0)
+        to       = 1.to_d / out_cons.sqrt(0)
+        c.weight = (to - from) * rand.to_d + from
       end
     end
     alias init_normalized! init_normalised!

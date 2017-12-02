@@ -53,5 +53,5 @@ puts "error: #{error.to_f}"
 puts "backprop gradients & updates:"
 gradients.each do |cid, g|
   c = network.connections.find{ |c| c.id == cid }
-  puts "#{c.input_neuron.name} -> #{c.output_neuron.name}: g = #{g.to_f}, u = #{(c.weight - (0.5.to_d.mult(g, 10))).to_f}"
+  puts "#{c.input_neuron.name} -> #{c.output_neuron.name}: g = #{g.to_f}, u = #{(c.weight - 0.5.to_d * g).to_f}"
 end

@@ -1,7 +1,7 @@
 module RANN
   class GradientChecker
     def self.epsilon
-      10.to_d.power -4, RANN.d + 2
+      10.to_d ** -4
     end
 
     def self.check network, inputs, targets, dvec
@@ -23,7 +23,7 @@ module RANN
         error_thetaminus = error outputs, targets
         network.reset!
 
-        gradapprox[i] = (error_thetaplus - error_thetaminus).div epsilon.mult(2, RANN.d), RANN.d
+        gradapprox[i] = (error_thetaplus - error_thetaminus) / (epsilon * 2)
       end
 
       gradapprox.each.with_index.with_object [] do |(ga, i), res|
@@ -35,7 +35,7 @@ module RANN
       total_squared_error = 0.to_d
 
       targets.size.times do |i|
-        total_squared_error += (targets[i] - outputs[i]).power(2, RANN.d + 2).div 2, RANN.d
+        total_squared_error += (targets[i] - outputs[i]) ** 2 / 2
       end
 
       total_squared_error
