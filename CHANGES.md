@@ -1,3 +1,7 @@
+- Fix bug in backprop over product neuron.
+
+  *Michael Campbell*
+
 - Worked out how to use BigDecimal properly, lol. Refactored to use
   `BigDecimal.limit`.
 

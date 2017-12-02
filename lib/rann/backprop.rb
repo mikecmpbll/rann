@@ -141,8 +141,11 @@ module RANN
               # connection's weight
               connection_delta =
                 if c.output_neuron.is_a? ProductNeuron
-                  intermediate = states[out_timestep][:intermediates][c.output_neuron.id]
-                  output_node_delta * intermediate / states[timestep][:values][c.input_neuron.id]
+                  intermediate =
+                    network.connections_to(c.output_neuron).reject{ |c2| c2 == c }.reduce 0.to_d do |m, c2|
+                      m * states[timestep][:values][c2.input_neuron.id] * c2.weight
+                    end
+                  output_node_delta * intermediate * c.weight
                 else
                   output_node_delta * c.weight
                 end
