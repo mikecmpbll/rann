@@ -128,34 +128,33 @@ module RANN
 
         # neuron delta is summation of neuron deltas deltas for the connections
         # from this neuron
-        node_delta =
+        step_one =
           if neuron.output?
             output_index = network.output_neurons.index neuron
-            activation_derivative = ACTIVATION_DERIVATIVES[neuron.activation_function]
-            mse_delta targets[output_index], outputs[output_index], activation_derivative
+            mse_delta targets[output_index], outputs[output_index]
           else
-            sum_of_deltas =
-              network.connections_from(neuron).reduce 0.to_d do |m, c|
-                out_timestep = c.output_neuron.context? ? timestep + 1 : timestep
-                output_node_delta = node_deltas[out_timestep][c.output_neuron.id]
+            network.connections_from(neuron).reduce 0.to_d do |m, c|
+              out_timestep = c.output_neuron.context? ? timestep + 1 : timestep
+              output_node_delta = node_deltas[out_timestep][c.output_neuron.id]
 
-                # connection delta is the output neuron delta multiplied by the
-                # connection's weight
-                connection_delta =
-                  if c.output_neuron.is_a? ProductNeuron
-                    intermediate = states[out_timestep][:intermediates][c.output_neuron.id]
-                    output_node_delta.mult intermediate.div(states[timestep][:values][c.input_neuron.id], 10), 10
-                  else
-                    output_node_delta.mult c.weight, 10
-                  end
+              # connection delta is the output neuron delta multiplied by the
+              # connection's weight
+              connection_delta =
+                if c.output_neuron.is_a? ProductNeuron
+                  intermediate = states[out_timestep][:intermediates][c.output_neuron.id]
+                  output_node_delta.mult intermediate.div(states[timestep][:values][c.input_neuron.id], 10), 10
+                else
+                  output_node_delta.mult c.weight, 10
+                end
 
-                m + connection_delta
-              end
-
-            ACTIVATION_DERIVATIVES[neuron.activation_function]
-              .call(states[timestep][:values][neuron.id])
-              .mult(sum_of_deltas, 10)
+              m + connection_delta
+            end
           end
+
+        node_delta =
+          ACTIVATION_DERIVATIVES[neuron.activation_function]
+            .call(states[timestep][:values][neuron.id])
+            .mult(step_one, 10)
 
         node_deltas[timestep][neuron.id] = node_delta
 
@@ -224,11 +223,8 @@ module RANN
       total_squared_error
     end
 
-    def self.mse_delta target, actual, activation_derivative
-      step_one = actual - target
-      step_two = activation_derivative.call actual
-
-      step_one.mult step_two, 10
+    def self.mse_delta target, actual
+      actual - target
     end
 
     def self.bptt_connecting_to neuron, network, timestep
