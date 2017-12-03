@@ -167,6 +167,8 @@ module RANN
 
     def init_normalised!
       connections.each do |c|
+        next if c.locked?
+
         out_cons = c.output_neuron.connection_count.to_d
         from     = -1.to_d / out_cons.sqrt(0)
         to       = 1.to_d / out_cons.sqrt(0)

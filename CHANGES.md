@@ -1,3 +1,5 @@
+- Don't change the weight of a LockedConnection during initialisation. (eugh)
+
 - Fix bug in backprop over product neuron.
 
   *Michael Campbell*
