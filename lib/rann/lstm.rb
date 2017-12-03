@@ -70,7 +70,7 @@ module RANN
 
     def add_input neuron
       @inputs.each do |input|
-        @network.add RANN::LockedConnection.new neuron, input, 1.to_d
+        @network.add RANN::Connection.new neuron, input
       end
     end
   end

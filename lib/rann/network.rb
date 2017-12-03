@@ -174,6 +174,8 @@ module RANN
         to       = 1.to_d / out_cons.sqrt(0)
         c.weight = (to - from) * rand.to_d + from
       end
+
+      true
     end
     alias init_normalized! init_normalised!
 
@@ -181,6 +183,8 @@ module RANN
       neurons.each do |neuron|
         neuron.connection_count = connections.count{ |c| c.output_neuron == neuron }
       end
+
+      true
     end
   end
 end

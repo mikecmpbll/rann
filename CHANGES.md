@@ -1,4 +1,12 @@
+- Don't lock the input connections into the LSTM layer, that acts as the fully
+  connected part of the network and that's where the majority of learning takes
+  place, derp.
+
+  *Michael Campbell*
+
 - Don't change the weight of a LockedConnection during initialisation. (eugh)
+
+  *Michael Campbell*
 
 - Fix bug in backprop over product neuron.
 
