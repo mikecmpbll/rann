@@ -35,8 +35,7 @@ module RANN
         memory_standard = RANN::Neuron.new("LSTM #{name} Mem Standard #{j}", 2, :standard, :linear).tap{ |n| @network.add n }
         memory_tanh = RANN::Neuron.new("LSTM #{name} Mem Tanh #{j}", 1, :standard, :tanh).tap{ |n| @network.add n }
         memory_o_product = RANN::ProductNeuron.new("LSTM #{name} Mem/Hidden 4 Product #{j}", 2, :standard, :linear).tap{ |n| @network.add n }
-        output = RANN::Neuron.new("LSTM #{name} Output #{j}", 1, :standard, :linear).tap{ |n| @network.add n }
-        @outputs << output
+        @outputs << memory_o_product
         memory_context = RANN::Neuron.new("LSTM #{name} Mem Context #{j}", 1, :context).tap{ |n| @network.add n }
         output_context = RANN::Neuron.new("LSTM #{name} Output Context #{j}", 1, :context).tap{ |n| @network.add n }
 
@@ -52,7 +51,6 @@ module RANN
         @network.add RANN::LockedConnection.new memory_standard, memory_tanh, 1.to_d
         @network.add RANN::LockedConnection.new o, memory_o_product, 1.to_d
         @network.add RANN::LockedConnection.new memory_tanh, memory_o_product, 1.to_d
-        @network.add RANN::LockedConnection.new memory_o_product, output, 1.to_d
         @network.add RANN::LockedConnection.new memory_standard, memory_context, 1.to_d
         @network.add RANN::LockedConnection.new memory_context, memory_product, 1.to_d
         @network.add RANN::LockedConnection.new memory_context, i, 1.to_d

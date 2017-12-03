@@ -41,7 +41,7 @@ module RANN
       # would probably be easier to detect circular dependency this way too?
       begin
         i = 0
-        until output_neurons.all?{ |neuron| neuron.value }
+        until connections.select(&:enabled?).all? &:processed?
           i += 1
           connections.each do |connection|
             next if !connection.enabled?

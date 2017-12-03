@@ -113,46 +113,67 @@ module RANN
       error = mse targets, outputs
 
       # backward pass with unravelling for recurrent networks
-      node_deltas = Hash.new{ |h, k| h[k] = Hash.new 0.to_d }
+      node_deltas = Hash.new{ |h, k| h[k] = {} }
       gradients = Hash.new 0.to_d
 
       initial_timestep = inputs.size - 1
       neuron_stack = network.output_neurons.map{ |n| [n, initial_timestep] }
+      skipped = []
 
       while current = neuron_stack.shift
         neuron, timestep = current
         next if node_deltas[timestep].key? neuron.id
 
-        from_here = bptt_connecting_to neuron, network, timestep
-        neuron_stack.push *from_here
-
         # neuron delta is summation of neuron deltas deltas for the connections
         # from this neuron
-        step_one =
-          if neuron.output?
-            output_index = network.output_neurons.index neuron
-            mse_delta targets[output_index], outputs[output_index]
-          else
+        if neuron.output?
+          output_index = network.output_neurons.index neuron
+          step_one = mse_delta targets[output_index], outputs[output_index]
+        else
+          sum =
             network.connections_from(neuron).reduce 0.to_d do |m, c|
               out_timestep = c.output_neuron.context? ? timestep + 1 : timestep
               output_node_delta = node_deltas[out_timestep][c.output_neuron.id]
 
-              # connection delta is the output neuron delta multiplied by the
-              # connection's weight
-              connection_delta =
-                if c.output_neuron.is_a? ProductNeuron
-                  intermediate =
-                    network.connections_to(c.output_neuron).reject{ |c2| c2 == c }.reduce 0.to_d do |m, c2|
-                      m * states[timestep][:values][c2.input_neuron.id] * c2.weight
-                    end
-                  output_node_delta * intermediate * c.weight
-                else
-                  output_node_delta * c.weight
+              if out_timestep > initial_timestep
+                m
+              else
+                # complicated network case, see NOTES.md
+                # can't find node delta, re-enqueue at back of queue and record
+                # the skip.
+                if !output_node_delta
+                  if skipped.size == neuron_stack.size + 1
+                    output_node_delta = 0.to_d
+                  else
+                    neuron_stack.push current
+                    skipped << current
+                    break
+                  end
                 end
 
-              m + connection_delta
+                # connection delta is the output neuron delta multiplied by the
+                # connection's weight
+                connection_delta =
+                  if c.output_neuron.is_a? ProductNeuron
+                    intermediate =
+                      network.connections_to(c.output_neuron).reject{ |c2| c2 == c }.reduce 1.to_d do |m, c2|
+                        m * states[timestep][:values][c2.input_neuron.id] * c2.weight
+                      end
+                    output_node_delta * intermediate * c.weight
+                  else
+                    output_node_delta * c.weight
+                  end
+
+                m + connection_delta
+              end
             end
-          end
+
+          step_one = sum || next
+        end
+
+        from_here = bptt_connecting_to neuron, network, timestep
+        neuron_stack.push *from_here
+        skipped.clear
 
         node_delta =
           ACTIVATION_DERIVATIVES[neuron.activation_function]
@@ -233,11 +254,12 @@ module RANN
       # halt traversal if we're at a context and we're at the base timestep
       return [] if neuron.context? && timestep == 0
 
+      timestep -= 1 if neuron.context?
+
       network.connections_to(neuron).each.with_object [] do |c, a|
         # don't enqueue connections from inputs
         next if c.input_neuron.input?
 
-        timestep -= timestep if neuron.context?
         a << [c.input_neuron, timestep]
       end
     end

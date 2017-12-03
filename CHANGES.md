@@ -1,3 +1,10 @@
+- So. Many. Bugs. Turns out the product neuron stuff was still broken and
+  network evaluation wasn't behaving correctly with context neurons (recurrent
+  connections). Also an error in timestep handling during backprop, and just
+  generally network traversal ...
+
+  *Michael Campbell*
+
 - Don't lock the input connections into the LSTM layer, that acts as the fully
   connected part of the network and that's where the majority of learning takes
   place, derp.
