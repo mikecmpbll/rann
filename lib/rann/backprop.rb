@@ -114,11 +114,16 @@ module RANN
 
       # backward pass with unravelling for recurrent networks
       node_deltas = Hash.new{ |h, k| h[k] = {} }
-      gradients = Hash.new 0.to_d
-
       initial_timestep = inputs.size - 1
       neuron_stack = network.output_neurons.map{ |n| [n, initial_timestep] }
-      skipped = []
+      # initialize network end-point node_deltas in all timesteps with zero
+      network.neurons_with_no_outgoing_connections.each do |n|
+        (0...(inputs.size - 1)).each do |i|
+          node_deltas[i][n.id] = 0.to_d
+          neuron_stack << [n, i]
+        end
+      end
+      gradients = Hash.new 0.to_d
 
       while current = neuron_stack.shift
         neuron, timestep = current
@@ -137,20 +142,9 @@ module RANN
 
               if out_timestep > initial_timestep
                 m
+              elsif !output_node_delta
+                break
               else
-                # complicated network case, see NOTES.md
-                # can't find node delta, re-enqueue at back of queue and record
-                # the skip.
-                if !output_node_delta
-                  if skipped.size == neuron_stack.size + 1
-                    output_node_delta = 0.to_d
-                  else
-                    neuron_stack.push current
-                    skipped << current
-                    break
-                  end
-                end
-
                 # connection delta is the output neuron delta multiplied by the
                 # connection's weight
                 connection_delta =
@@ -172,8 +166,7 @@ module RANN
         end
 
         from_here = bptt_connecting_to neuron, network, timestep
-        neuron_stack.push *from_here
-        skipped.clear
+        neuron_stack |= from_here
 
         node_delta =
           ACTIVATION_DERIVATIVES[neuron.activation_function]
@@ -215,7 +208,7 @@ module RANN
       end
     end
 
-    def restore filepath
+    def restore filepath = nil
       unless filepath
         filepath = Dir['*'].select{ |f| f =~ /rann_savepoint_.*/ }.sort.last
 

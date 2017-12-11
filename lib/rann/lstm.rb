@@ -19,7 +19,7 @@ module RANN
 
     def init
       @size.times do |j|
-        input = RANN::Neuron.new("LSTM #{name} Input #{j}", 0, :standard).tap{ |n| @network.add n }
+        input = RANN::Neuron.new("LSTM #{name} Input #{j}", 0, :standard, :linear).tap{ |n| @network.add n }
         @inputs << input
 
         f = RANN::Neuron.new("LSTM #{name} F #{j}", 3, :standard, :sig).tap{ |n| @network.add n }
@@ -36,7 +36,11 @@ module RANN
         memory_tanh = RANN::Neuron.new("LSTM #{name} Mem Tanh #{j}", 1, :standard, :tanh).tap{ |n| @network.add n }
         memory_o_product = RANN::ProductNeuron.new("LSTM #{name} Mem/Hidden 4 Product #{j}", 2, :standard, :linear).tap{ |n| @network.add n }
         @outputs << memory_o_product
-        memory_context = RANN::Neuron.new("LSTM #{name} Mem Context #{j}", 1, :context).tap{ |n| @network.add n }
+        memory_context =
+          RANN::Neuron.new("LSTM #{name} Mem Context #{j}", 1, :context).tap do |n|
+            @network.add n
+            n.value = 1.to_d # connecting to a product neuron
+          end
         output_context = RANN::Neuron.new("LSTM #{name} Output Context #{j}", 1, :context).tap{ |n| @network.add n }
 
         @network.add RANN::Connection.new input, f

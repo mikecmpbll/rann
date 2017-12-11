@@ -1,3 +1,16 @@
+- More backprop fixes..
+
+  *Michael Campbell*
+
+- Give LSTM input neurons linear activation.
+
+  *Michael Campbell*
+
+- For context neurons connected to a product neuron, it's initial value should
+  be 1.
+
+  *Michael Campbell*
+
 - So. Many. Bugs. Turns out the product neuron stuff was still broken and
   network evaluation wasn't behaving correctly with context neurons (recurrent
   connections). Also an error in timestep handling during backprop, and just

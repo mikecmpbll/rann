@@ -74,7 +74,7 @@ module RANN
     end
 
     def initial_activation_function
-      if standard? || context?
+      if standard?
         :relu
       else
         :linear

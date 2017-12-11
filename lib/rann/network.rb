@@ -186,5 +186,13 @@ module RANN
 
       true
     end
+
+    def neurons_with_no_outgoing_connections
+      return @no_outgoing if defined? @no_outgoing
+
+      neurons.select do |n|
+        connections_from(n).none?
+      end
+    end
   end
 end
